@@ -46,28 +46,90 @@ def has_delete_without_where(command: str) -> bool:
     return False
 
 
+def shell_tokens(command: str) -> list[str]:
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()")
+        lexer.whitespace_split = True
+        return list(lexer)
+    except ValueError:
+        return command.split()
+
+
+def split_shell_commands(tokens: list[str]) -> list[list[str]]:
+    commands: list[list[str]] = []
+    current: list[str] = []
+    for token in tokens:
+        if token in {";", "&&", "||", "|", "&", "(", ")"}:
+            if current:
+                commands.append(current)
+                current = []
+        else:
+            current.append(token)
+    if current:
+        commands.append(current)
+    return commands
+
+
+def strip_command_prefixes(tokens: list[str]) -> list[str]:
+    remaining = tokens[:]
+    while remaining:
+        head = remaining[0]
+        if "=" in head and not head.startswith("-") and head.split("=", 1)[0].isidentifier():
+            remaining = remaining[1:]
+            continue
+        if head in {"sudo", "command", "builtin", "time"}:
+            remaining = remaining[1:]
+            continue
+        if head == "env":
+            remaining = remaining[1:]
+            while remaining and "=" in remaining[0] and not remaining[0].startswith("-"):
+                remaining = remaining[1:]
+            continue
+        return remaining
+    return remaining
+
+
+def inspect_rm_tokens(tokens: list[str]) -> bool:
+    flags = "".join(t[1:] for t in tokens[1:] if t.startswith("-") and not t.startswith("--"))
+    long_flags = {t for t in tokens[1:] if t.startswith("--")}
+    has_recursive = "r" in flags or "R" in flags or "--recursive" in long_flags
+    has_force = "f" in flags or "--force" in long_flags
+    return has_recursive and has_force
+
+
+def inspect_shell_commands(command: str) -> str | None:
+    for tokens in split_shell_commands(shell_tokens(command)):
+        tokens = strip_command_prefixes(tokens)
+        if not tokens:
+            continue
+
+        executable = Path(tokens[0]).name
+        if executable in {"bash", "sh", "zsh"} and "-c" in tokens:
+            index = tokens.index("-c")
+            if index + 1 < len(tokens):
+                nested = detect_destructive_pattern(tokens[index + 1])
+                if nested:
+                    return nested
+
+        if executable == "rm" and inspect_rm_tokens(tokens):
+            return "rm recursive+force (for example rm -rf)"
+
+        if executable == "git" and len(tokens) >= 3 and tokens[1] == "push":
+            if any(t in {"--force", "--force-with-lease", "-f"} or t.startswith("+refs/") or t.startswith("+") for t in tokens[2:]):
+                return "git push --force"
+
+    return None
+
+
 def detect_destructive_pattern(command: str) -> str | None:
     compact = normalize_space(command)
     lowered = compact.lower()
 
-    # Required shell patterns. Token-aware checks catch common spelling variants
-    # while avoiding harmless strings like `echo rm -rf` where possible.
-    try:
-        tokens = shlex.split(command, posix=True)
-    except ValueError:
-        tokens = compact.split()
-
-    for index, token in enumerate(tokens):
-        if token == "rm":
-            flags = "".join(t[1:] for t in tokens[index + 1 :] if t.startswith("-") and not t.startswith("--"))
-            long_flags = {t for t in tokens[index + 1 :] if t.startswith("--")}
-            has_recursive = "r" in flags or "R" in flags or "--recursive" in long_flags
-            has_force = "f" in flags or "--force" in long_flags
-            if has_recursive and has_force:
-                return "rm recursive+force (for example rm -rf)"
-
-    if re.search(r"\bgit\s+push\b[^\n;|&]*(?:--force(?:-with-lease)?\b|-f\b|\+[^\s]+)", compact):
-        return "git push --force"
+    # Required shell patterns. Token-aware checks catch command variants while
+    # avoiding harmless documentation/search strings such as `echo rm -rf`.
+    shell_reason = inspect_shell_commands(command)
+    if shell_reason:
+        return shell_reason
 
     if re.search(r"\bdrop\s+table\b", lowered):
         return "DROP TABLE"

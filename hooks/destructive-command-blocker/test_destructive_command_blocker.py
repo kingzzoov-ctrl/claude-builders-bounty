@@ -40,6 +40,8 @@ class DestructiveCommandBlockerTest(unittest.TestCase):
     def test_blocks_rm_rf(self) -> None:
         self.assert_denied("rm -rf build/")
         self.assert_denied("rm -fr build/")
+        self.assert_denied("sudo rm --recursive --force build/")
+        self.assert_denied("bash -c 'rm -rf build/'")
 
     def test_blocks_drop_table(self) -> None:
         self.assert_denied("psql -c 'DROP TABLE users;'")
@@ -47,6 +49,7 @@ class DestructiveCommandBlockerTest(unittest.TestCase):
     def test_blocks_force_push(self) -> None:
         self.assert_denied("git push --force origin main")
         self.assert_denied("git push -f origin main")
+        self.assert_denied("git push origin +main")
 
     def test_blocks_truncate(self) -> None:
         self.assert_denied("mysql -e 'TRUNCATE audit_log;'")
