@@ -34,6 +34,14 @@ You're in the right place.
 
 ---
 
+## Quick Start
+
+1. Run `bash changelog.sh` from any Git repository.
+2. Commit the generated `CHANGELOG.md`.
+3. Submit the PR with a sample output from a real repo.
+
+---
+
 ## Rules
 
 - Tasks must be related to Claude Code or AI tooling
