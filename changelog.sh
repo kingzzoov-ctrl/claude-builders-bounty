@@ -43,7 +43,7 @@ REMOVED="${TMP_DIR}/removed"
 
 # Read commits oldest -> newest for a stable, readable changelog.
 # Format: subject only; merge commits are skipped to reduce noise.
-while IFS= read -r subject; do
+while IFS= read -r subject || [ -n "${subject}" ]; do
   [ -n "${subject}" ] || continue
 
   clean_subject="${subject}"
@@ -65,13 +65,13 @@ while IFS= read -r subject; do
   item="- ${clean_subject}"
 
   case "${lower}" in
-    feat:*|feat\(*|*" add "*|add\ *|*" added "*|*" implement "*|implement\ *|*" introduce "*|introduce\ *)
+    feat:*|feat\(*|add*|added*|implement*|introduce*)
       printf '%s\n' "${item}" >>"${ADDED}"
       ;;
-    fix:*|fix\(*|*" fix "*|fix\ *|*" fixed "*|*" bug "*|*" resolve "*|resolve\ *)
+    fix:*|fix\(*|bug*|resolve*|fixed*)
       printf '%s\n' "${item}" >>"${FIXED}"
       ;;
-    remove:*|removed:*|delete:*|deleted:*|*" remove "*|remove\ *|*" removed "*|*" delete "*|delete\ *|*" deprecate "*|deprecate\ *)
+    remove:*|removed:*|delete:*|deleted:*|deprecate*|drop*)
       printf '%s\n' "${item}" >>"${REMOVED}"
       ;;
     *)
