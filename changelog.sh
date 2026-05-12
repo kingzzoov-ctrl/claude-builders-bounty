@@ -47,19 +47,9 @@ while IFS= read -r subject || [ -n "${subject}" ]; do
   [ -n "${subject}" ] || continue
 
   clean_subject="${subject}"
-  clean_subject="${clean_subject#feat: }"
-  clean_subject="${clean_subject#feat!: }"
-  clean_subject="${clean_subject#fix: }"
-  clean_subject="${clean_subject#fix!: }"
-  clean_subject="${clean_subject#chore: }"
-  clean_subject="${clean_subject#docs: }"
-  clean_subject="${clean_subject#refactor: }"
-  clean_subject="${clean_subject#perf: }"
-  clean_subject="${clean_subject#test: }"
-  clean_subject="${clean_subject#style: }"
-  clean_subject="${clean_subject#build: }"
-  clean_subject="${clean_subject#ci: }"
-  clean_subject="${clean_subject#revert: }"
+  # Strip common Conventional Commit prefixes for cleaner changelog entries.
+  # Handles both `type: subject` and `type(scope): subject` forms.
+  clean_subject="$(printf '%s' "${clean_subject}" | sed -E 's/^(feat|fix|chore|docs|refactor|perf|test|style|build|ci|revert|remove|removed|delete|deleted|deprecate|drop)(\([^)]*\))?!?:[[:space:]]*//')"
 
   lower="$(printf '%s' "${subject}" | tr '[:upper:]' '[:lower:]')"
   item="- ${clean_subject}"
