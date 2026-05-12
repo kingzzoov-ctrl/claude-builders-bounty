@@ -71,7 +71,7 @@ while IFS= read -r subject || [ -n "${subject}" ]; do
     fix:*|fix\(*|bug*|resolve*|fixed*)
       printf '%s\n' "${item}" >>"${FIXED}"
       ;;
-    remove:*|removed:*|delete:*|deleted:*|deprecate*|drop*)
+    remove*|removed*|delete*|deleted*|deprecate*|drop*)
       printf '%s\n' "${item}" >>"${REMOVED}"
       ;;
     *)
