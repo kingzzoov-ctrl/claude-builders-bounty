@@ -48,8 +48,9 @@ while IFS= read -r subject || [ -n "${subject}" ]; do
 
   clean_subject="${subject}"
   # Strip common Conventional Commit prefixes for cleaner changelog entries.
-  # Handles both `type: subject` and `type(scope): subject` forms.
+  # Handles both `type: subject` and `type(scope): subject` forms, plus plain action verbs.
   clean_subject="$(printf '%s' "${clean_subject}" | sed -E 's/^(feat|fix|chore|docs|refactor|perf|test|style|build|ci|revert|remove|removed|delete|deleted|deprecate|drop)(\([^)]*\))?!?:[[:space:]]*//')"
+  clean_subject="$(printf '%s' "${clean_subject}" | sed -E 's/^(remove|removed|delete|deleted|deprecate|drop)[[:space:]-]+//I')"
 
   lower="$(printf '%s' "${subject}" | tr '[:upper:]' '[:lower:]')"
   item="- ${clean_subject}"
