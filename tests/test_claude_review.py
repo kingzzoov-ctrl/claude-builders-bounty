@@ -34,6 +34,14 @@ class ClaudeReviewTests(unittest.TestCase):
         self.assertIn("Summary of changes", agent)
         self.assertIn("Confidence score", agent)
 
+    def test_workflow_uses_minimum_comment_permissions(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "claude-review.yml").read_text(encoding="utf-8")
+
+        self.assertIn("contents: read", workflow)
+        self.assertIn("issues: write", workflow)
+        self.assertIn("pull-requests: read", workflow)
+        self.assertNotIn("pull-requests: write", workflow)
+
     def test_build_review_includes_required_sections_and_confidence(self) -> None:
         pr = {
             "title": "Add workflow automation",
