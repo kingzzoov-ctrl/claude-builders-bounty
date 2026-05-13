@@ -26,6 +26,14 @@ class ClaudeReviewTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             claude_review.parse_pr_url("https://github.com/example/project/issues/42")
 
+    def test_agent_definition_documents_cli_usage(self) -> None:
+        agent = (ROOT / ".claude" / "agents" / "pr-reviewer.md").read_text(encoding="utf-8")
+
+        self.assertIn("name: pr-reviewer", agent)
+        self.assertIn("python3 claude-review --pr", agent)
+        self.assertIn("Summary of changes", agent)
+        self.assertIn("Confidence score", agent)
+
     def test_build_review_includes_required_sections_and_confidence(self) -> None:
         pr = {
             "title": "Add workflow automation",
