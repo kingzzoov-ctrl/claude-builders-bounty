@@ -24,6 +24,8 @@ To post the output as a PR comment, set `GITHUB_TOKEN` with permission to commen
 python3 claude-review --pr https://github.com/owner/repo/pull/123 --post-comment
 ```
 
+`--post-comment` is idempotent: generated comments include an invisible marker, so reruns update the existing agent comment instead of spamming duplicate comments.
+
 ## Review format
 
 Always preserve the generated sections:

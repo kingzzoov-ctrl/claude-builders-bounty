@@ -13,6 +13,9 @@ from dataclasses import dataclass
 from typing import Iterable
 
 
+COMMENT_MARKER = "<!-- claude-review-agent -->"
+
+
 @dataclass
 class FileChange:
     filename: str
@@ -34,14 +37,22 @@ def parse_pr_url(url: str) -> tuple[str, str, int]:
     return owner, repo, int(number)
 
 
-def github_json(url: str):
+def github_request(url: str, *, method: str = "GET", data: bytes | None = None):
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "claude-review"}
     token = os.getenv("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=30) as response:
+        if response.status == 204:
+            return None
         return json.load(response)
+
+
+def github_json(url: str):
+    return github_request(url)
 
 
 def fetch_all_pages(url: str) -> list[dict]:
@@ -150,6 +161,7 @@ def build_review(pr_url: str) -> str:
         return "\n".join(f"- {item}" for item in items)
 
     return (
+        f"{COMMENT_MARKER}\n"
         "## Claude PR Review\n\n"
         "### Summary of changes\n"
         f"{summary}\n\n"
@@ -161,25 +173,25 @@ def build_review(pr_url: str) -> str:
         f"**{conf}**\n"
     )
 
-
-
-
 def post_pr_comment(owner: str, repo: str, number: int, body: str) -> None:
-    """Post a generated review comment to the pull request issue thread."""
+    """Post or update the generated review comment on the pull request thread."""
     token = os.getenv("GITHUB_TOKEN")
     if not token:
         raise SystemExit("GITHUB_TOKEN is required when using --post-comment")
     api_url = f"https://api.github.com/repos/{owner}/{repo}/issues/{number}/comments"
+
+    comments = github_json(api_url)
+    if not isinstance(comments, list):
+        raise SystemExit("Expected a GitHub comments list response")
+
     payload = json.dumps({"body": body}).encode("utf-8")
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "User-Agent": "claude-review",
-    }
-    request = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
-    with urllib.request.urlopen(request, timeout=30):
-        return
+    for comment in comments:
+        if COMMENT_MARKER in str(comment.get("body", "")) and comment.get("url"):
+            github_request(comment["url"], method="PATCH", data=payload)
+            return
+
+    github_request(api_url, method="POST", data=payload)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a structured Markdown PR review comment.")
