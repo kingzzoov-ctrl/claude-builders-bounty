@@ -38,7 +38,7 @@ You're in the right place.
 
 1. Run `bash changelog.sh` from any Git repository.
 2. Commit the generated `CHANGELOG.md`.
-3. Submit the PR with a sample output from a real repo.
+3. Optional: run `bash tests/test-changelog.sh` to verify the generator with a tagged sample repo.
 
 ---
 

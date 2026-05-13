@@ -35,6 +35,14 @@ bash changelog.sh docs/CHANGELOG.md
 - `Removed`: `remove`, `removed`, `delete`, `deleted`, `deprecate`
 - `Changed`: everything else
 
+## Verification
+
+Run the regression test from this repository to verify tag-range handling and all four categories:
+
+```bash
+bash tests/test-changelog.sh
+```
+
 ## Notes
 
 - The script attempts to fetch tags first so it works better in CI and shallow clones.
