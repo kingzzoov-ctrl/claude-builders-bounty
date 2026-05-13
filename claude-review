@@ -44,10 +44,25 @@ def github_json(url: str):
         return json.load(response)
 
 
+def fetch_all_pages(url: str) -> list[dict]:
+    """Fetch paginated GitHub list responses until an incomplete final page."""
+    items: list[dict] = []
+    page = 1
+    separator = "&" if "?" in url else "?"
+    while True:
+        page_items = github_json(f"{url}{separator}per_page=100&page={page}")
+        if not isinstance(page_items, list):
+            raise SystemExit(f"Expected a GitHub list response from {url}")
+        items.extend(page_items)
+        if len(page_items) < 100:
+            return items
+        page += 1
+
+
 def fetch_pr(owner: str, repo: str, number: int) -> tuple[dict, list[FileChange]]:
     base = f"https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
     pr = github_json(base)
-    files_raw = github_json(base + "/files?per_page=100")
+    files_raw = fetch_all_pages(base + "/files")
     files = [
         FileChange(
             filename=item.get("filename", ""),
@@ -147,10 +162,34 @@ def build_review(pr_url: str) -> str:
     )
 
 
+
+
+def post_pr_comment(owner: str, repo: str, number: int, body: str) -> None:
+    """Post a generated review comment to the pull request issue thread."""
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise SystemExit("GITHUB_TOKEN is required when using --post-comment")
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/issues/{number}/comments"
+    payload = json.dumps({"body": body}).encode("utf-8")
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "User-Agent": "claude-review",
+    }
+    request = urllib.request.Request(api_url, data=payload, headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=30):
+        return
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a structured Markdown PR review comment.")
     parser.add_argument("--pr", required=True, help="GitHub PR URL, e.g. https://github.com/owner/repo/pull/123")
     parser.add_argument("--output", help="Optional output file. Defaults to stdout.")
+    parser.add_argument(
+        "--post-comment",
+        action="store_true",
+        help="Post the generated review as a PR comment using GITHUB_TOKEN.",
+    )
     args = parser.parse_args()
     review = build_review(args.pr)
     if args.output:
@@ -158,6 +197,9 @@ def main() -> int:
             handle.write(review)
     else:
         print(review, end="")
+    if args.post_comment:
+        owner, repo, number = parse_pr_url(args.pr)
+        post_pr_comment(owner, repo, number, review)
     return 0
 
 
