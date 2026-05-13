@@ -39,3 +39,6 @@ Each JSONL record includes:
 ```bash
 python3 hooks/destructive-command-blocker/test_destructive_command_blocker.py
 ```
+
+The test suite covers the required destructive patterns, safe Bash commands,
+non-Bash hook payloads, malformed hook input, and the JSONL blocked-attempt log.

@@ -41,6 +41,7 @@ class DestructiveCommandBlockerTest(unittest.TestCase):
         self.assert_denied("rm -rf build/")
         self.assert_denied("rm -fr build/")
         self.assert_denied("sudo rm --recursive --force build/")
+        self.assert_denied("env -i PATH=/usr/bin rm -rf build/")
         self.assert_denied("bash -c 'rm -rf build/'")
 
     def test_blocks_drop_table(self) -> None:
@@ -52,6 +53,26 @@ class DestructiveCommandBlockerTest(unittest.TestCase):
         self.assert_denied("git push origin +main")
         self.assert_denied("git -c push.default=simple push --force-with-lease origin main")
         self.assert_denied("git --git-dir .git push --force origin main")
+
+    def test_ignores_non_bash_payloads_and_bad_json(self) -> None:
+        payload = {"tool_name": "Read", "tool_input": {"file_path": "rm -rf notes.txt"}}
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertEqual(json.loads(result.stdout)["permissionDecision"], "allow")
+
+        bad = subprocess.run(
+            [sys.executable, str(SCRIPT)],
+            input="not json",
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertEqual(json.loads(bad.stdout)["permissionDecision"], "allow")
 
     def test_blocks_truncate(self) -> None:
         self.assert_denied("mysql -e 'TRUNCATE audit_log;'")

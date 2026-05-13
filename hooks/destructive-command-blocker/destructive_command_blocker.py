@@ -82,8 +82,24 @@ def strip_command_prefixes(tokens: list[str]) -> list[str]:
             continue
         if head == "env":
             remaining = remaining[1:]
-            while remaining and "=" in remaining[0] and not remaining[0].startswith("-"):
-                remaining = remaining[1:]
+            # `env` supports option-only prefixes before the command. Keep this
+            # small but practical so variants such as `env -i FOO=bar rm -rf x`
+            # are inspected as the underlying `rm` invocation.
+            env_options_with_value = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
+            while remaining:
+                if "=" in remaining[0] and not remaining[0].startswith("-"):
+                    remaining = remaining[1:]
+                    continue
+                if remaining[0] in {"-i", "--ignore-environment", "-0", "--null"}:
+                    remaining = remaining[1:]
+                    continue
+                if remaining[0] in env_options_with_value:
+                    remaining = remaining[2:] if len(remaining) > 1 else []
+                    continue
+                if any(remaining[0].startswith(prefix + "=") for prefix in env_options_with_value if prefix.startswith("--")):
+                    remaining = remaining[1:]
+                    continue
+                break
             continue
         return remaining
     return remaining
