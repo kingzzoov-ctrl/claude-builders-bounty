@@ -50,6 +50,8 @@ class DestructiveCommandBlockerTest(unittest.TestCase):
         self.assert_denied("git push --force origin main")
         self.assert_denied("git push -f origin main")
         self.assert_denied("git push origin +main")
+        self.assert_denied("git -c push.default=simple push --force-with-lease origin main")
+        self.assert_denied("git --git-dir .git push --force origin main")
 
     def test_blocks_truncate(self) -> None:
         self.assert_denied("mysql -e 'TRUNCATE audit_log;'")

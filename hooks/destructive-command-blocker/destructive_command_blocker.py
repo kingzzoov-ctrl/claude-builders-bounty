@@ -97,6 +97,46 @@ def inspect_rm_tokens(tokens: list[str]) -> bool:
     return has_recursive and has_force
 
 
+def git_subcommand_index(tokens: list[str]) -> int | None:
+    """Return the index of the git subcommand, skipping global options.
+
+    Git accepts options before the subcommand (for example
+    `git -c push.default=simple push --force-with-lease`). The hook should still
+    block destructive push variants even when contributors use those options.
+    """
+    index = 1
+    options_with_value = {"-c", "--config-env", "--git-dir", "--work-tree", "--namespace"}
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "--":
+            index += 1
+            break
+        if token in options_with_value:
+            index += 2
+            continue
+        if any(token.startswith(prefix + "=") for prefix in options_with_value if prefix.startswith("--")):
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        return index
+    return index if index < len(tokens) else None
+
+
+def inspect_git_tokens(tokens: list[str]) -> bool:
+    subcommand_index = git_subcommand_index(tokens)
+    if subcommand_index is None or tokens[subcommand_index] != "push":
+        return False
+    return any(
+        t in {"--force", "--force-with-lease", "-f"}
+        or t.startswith("--force-with-lease=")
+        or t.startswith("+refs/")
+        or t.startswith("+")
+        for t in tokens[subcommand_index + 1 :]
+    )
+
+
 def inspect_shell_commands(command: str) -> str | None:
     for tokens in split_shell_commands(shell_tokens(command)):
         tokens = strip_command_prefixes(tokens)
@@ -114,9 +154,8 @@ def inspect_shell_commands(command: str) -> str | None:
         if executable == "rm" and inspect_rm_tokens(tokens):
             return "rm recursive+force (for example rm -rf)"
 
-        if executable == "git" and len(tokens) >= 3 and tokens[1] == "push":
-            if any(t in {"--force", "--force-with-lease", "-f"} or t.startswith("+refs/") or t.startswith("+") for t in tokens[2:]):
-                return "git push --force"
+        if executable == "git" and inspect_git_tokens(tokens):
+            return "git push --force"
 
     return None
 
